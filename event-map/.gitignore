@@ -146,7 +146,6 @@ temp/
 
 # Gatsby
 .cache/
-public
 
 # Storybook
 storybook-static
