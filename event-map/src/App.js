@@ -64,9 +64,13 @@ const App = () => {
   const [mapCenter, setMapCenter] = useState([55.7558, 37.6173]);
   const [loading, setLoading] = useState(true);
   const [showAlphaMessage, setShowAlphaMessage] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [currentTranslateY, setCurrentTranslateY] = useState(0);
+  const [panelHeight, setPanelHeight] = useState(80);
+
   const mobilePanelRef = useRef(null);
+  const categoriesScrollRef = useRef(null);
+  const eventsScrollRef = useRef(null);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
 
   const categories = [
     'концерт', 'выставка', 'театр', 'кино', 'фестиваль',
@@ -100,27 +104,27 @@ const App = () => {
     if (!panel) return;
 
     const handleTouchStart = (e) => {
-      setStartY(e.touches[0].clientY);
+      startYRef.current = e.touches[0].clientY;
+      startHeightRef.current = panelHeight;
     };
 
     const handleTouchMove = (e) => {
       if (!isMobileMenuOpen) return;
 
       const currentY = e.touches[0].clientY;
-      const diff = startY - currentY;
+      const diff = startYRef.current - currentY;
+      const newHeight = Math.min(Math.max(startHeightRef.current + diff, 80), window.innerHeight - 50);
 
-      // Разрешаем только скролл вверх (отрицательные значения)
-      if (diff > 0) {
-        setCurrentTranslateY(-Math.min(diff, 100));
-      }
+      setPanelHeight(newHeight);
     };
 
     const handleTouchEnd = (e) => {
-      if (currentTranslateY < -50) {
-        // Закрываем панель при достаточно сильном свайпе вверх
+      if (panelHeight < 150) {
         setIsMobileMenuOpen(false);
+        setPanelHeight(80);
+      } else if (panelHeight > window.innerHeight * 0.7) {
+        setPanelHeight(window.innerHeight - 50);
       }
-      setCurrentTranslateY(0);
     };
 
     panel.addEventListener('touchstart', handleTouchStart);
@@ -132,7 +136,7 @@ const App = () => {
       panel.removeEventListener('touchmove', handleTouchMove);
       panel.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isMobileMenuOpen, startY, currentTranslateY]);
+  }, [isMobileMenuOpen, panelHeight]);
 
   // Фильтрация мероприятий
   useEffect(() => {
@@ -177,11 +181,22 @@ const App = () => {
     }
     if (window.innerWidth <= 768) {
       setIsMobileMenuOpen(false);
+      setPanelHeight(80);
     }
   };
 
   const handleDetailsClick = () => {
     setShowAlphaMessage(true);
+  };
+
+  const toggleMobileMenu = () => {
+    if (isMobileMenuOpen) {
+      setIsMobileMenuOpen(false);
+      setPanelHeight(80);
+    } else {
+      setIsMobileMenuOpen(true);
+      setPanelHeight(window.innerHeight * 0.7);
+    }
   };
 
   // Расширенные моковые данные
@@ -435,19 +450,16 @@ const App = () => {
           </div>
         </div>
 
-        {/* Мобильная версия - нижняя панель */}
-        <div className="mobile-panel" ref={mobilePanelRef}>
-          <div
-              className="mobile-handle glass-panel"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            <div className="handle-bar"></div>
-          </div>
-
-          <div
-              className={`mobile-content glass-panel ${isMobileMenuOpen ? 'open' : ''}`}
-              style={{ transform: `translateY(${currentTranslateY}px)` }}
-          >
+        {/* Переработанная мобильная версия */}
+        <div
+            className={`mobile-panel ${isMobileMenuOpen ? 'open' : ''}`}
+            ref={mobilePanelRef}
+            style={{ height: `${panelHeight}px` }}
+        >
+          <div className="mobile-header glass-panel">
+            <div className="mobile-handle" onClick={toggleMobileMenu}>
+              <div className="handle-bar"></div>
+            </div>
             <div className="mobile-search">
               <input
                   type="text"
@@ -456,9 +468,11 @@ const App = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+          </div>
 
+          <div className="mobile-content">
             <div className="mobile-categories">
-              <div className="categories-scroll">
+              <div className="categories-scroll" ref={categoriesScrollRef}>
                 {categories.map(category => (
                     <button
                         key={category}
@@ -475,7 +489,7 @@ const App = () => {
               <div className="mobile-events-header">
                 <h3>Мероприятия ({filteredEvents.length})</h3>
               </div>
-              <div className="events-scroll">
+              <div className="events-scroll" ref={eventsScrollRef}>
                 {loading ? (
                     <div className="loading">Загрузка мероприятий...</div>
                 ) : filteredEvents.length === 0 ? (
